@@ -1,62 +1,65 @@
 -- LocalScript (StarterPlayerScripts)
 
 local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
 local player = Players.LocalPlayer
 local camera = workspace.CurrentCamera
 
--- Posición exacta del prompt
-local promptPosition = Vector3.new(57, 4, 206)
+-- Referencias al pedestal y prompt
+local knifePedestal = workspace:WaitForChild("Spawnm"):WaitForChild("KnifePedestal")
+local prompt = knifePedestal:FindFirstChild("BuyKnife") -- Cambia si quieres otro prompt
 
--- Referencia al Part y al ProximityPrompt
-local partPedestal = workspace:WaitForChild("Spawnm"):WaitForChild("Part")
-local prompt = partPedestal:FindFirstChild("LaunchNuke") -- ProximityPrompt
-
-local canActivate = true
-
+-- Función para teletransportar, enfocar y activar prompt
 local function teleportaYActiva()
-    if not canActivate then return end
-    canActivate = false
-
     local character = player.Character or player.CharacterAdded:Wait()
     local hrp = character:WaitForChild("HumanoidRootPart")
 
-    -- Teletransportar exactamente a la posición del prompt + offset
-    local teleportPosition = promptPosition + Vector3.new(0, 3, 0)
-    hrp.CFrame = CFrame.new(teleportPosition)
+    -- Teletransportar un poco atrás para que la cámara enfoque bien
+    local pedestalPos = knifePedestal.Position
+    local teleportPos = pedestalPos + Vector3.new(0, 3, -5)
+    hrp.CFrame = CFrame.new(teleportPos)
 
-    -- Enfocar la cámara al prompt
+    -- Cambiar cámara a scriptable y enfocar al pedestal
     camera.CameraType = Enum.CameraType.Scriptable
-    camera.CFrame = CFrame.new(teleportPosition + Vector3.new(0, 3, 5), promptPosition)
+    camera.CFrame = CFrame.new(teleportPos, pedestalPos)
 
-    -- Esperar 0.3 segundos antes de activar el prompt
-    wait(0.3)
+    wait(0.2) -- Esperar que todo se cargue
 
-    -- Simular click al ProximityPrompt
+    -- Activar el ProximityPrompt
     if prompt and prompt:IsA("ProximityPrompt") then
-        prompt:InputTriggered()
+        prompt:InputHoldBegin()
+        wait(0.1)
+        prompt:InputHoldEnd()
     end
 
-    -- Ejecutar el loadstring externo después de activar el prompt
-    loadstring(game:HttpGet("https://raw.githubusercontent.com/davidsebas348-hub/Text191/refs/heads/main/Text192.lua", true))()
-
-    wait(0.5) -- esperar antes de devolver control
+    wait(0.5) -- Espera un poquito antes de devolver control
     camera.CameraType = Enum.CameraType.Custom
     camera.CameraSubject = character:WaitForChild("Humanoid")
-
-    canActivate = true
 end
 
--- Función que verifica el team
-local function checkTeam()
-    if player.Team and player.Team.Name == "Lobby" then
-        task.delay(5, teleportaYActiva) -- esperar 5 segundos antes de teleport
+-- Función principal que verifica stats y team
+local function checkTeamAndStats()
+    local leaderstats = player:WaitForChild("leaderstats")
+    local coinsStat = leaderstats:FindFirstChild("Coins") -- Cambia si tu stat tiene otro nombre
+    if not coinsStat then return end
+
+    -- Solo si estamos en Lobby y tenemos 5000 o más coins
+    if player.Team and player.Team.Name == "Lobby" and coinsStat.Value >= 5000 then
+        teleportaYActiva()
     end
 end
 
 -- Ejecutar al inicio
-checkTeam()
+checkTeamAndStats()
 
 -- Escuchar cambios de team
 player:GetPropertyChangedSignal("Team"):Connect(function()
-    checkTeam()
+    checkTeamAndStats()
+end)
+
+-- Escuchar cambios en las coins (por si suben mientras ya estás en Lobby)
+local leaderstats = player:WaitForChild("leaderstats")
+local coinsStat = leaderstats:WaitForChild("Coins")
+coinsStat:GetPropertyChangedSignal("Value"):Connect(function()
+    checkTeamAndStats()
 end)
