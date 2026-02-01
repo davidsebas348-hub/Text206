@@ -1,55 +1,71 @@
--- ===============================
--- TELEPORT + LOADSTRING ONCE + CAMARA ENFOCANDO EL PEDestal
--- ===============================
-
+-- ===== AUTO BUY KNIFE PARA LOADRING =====
 local Players = game:GetService("Players")
 local Workspace = game:GetService("Workspace")
+local RunService = game:GetService("RunService")
 local LocalPlayer = Players.LocalPlayer
 local camera = Workspace.CurrentCamera
 
--- Coordenadas a teletransportar
-local teleportCoords = Vector3.new(6, 25, 182) -- Cambia a la que quieras
+-- Toggle global
+if _G.AutoBuyKnife == nil then _G.AutoBuyKnife = false end
+_G.AutoBuyKnife = true -- lo activamos directo
 
--- Pedestal / prompt (para enfocar cámara)
-local knifePedestal = Workspace:WaitForChild("Spawnm"):WaitForChild("KnifePedestal")
-local prompt = knifePedestal:FindFirstChild("BuyKnife") -- Cambia si otro prompt
+-- Referencias al pedestal y prompt
+local function getKnifePedestal()
+    return Workspace:WaitForChild("Spawnm"):WaitForChild("KnifePedestal")
+end
 
--- Flag para que solo se ejecute una vez por TP
-local hasTeleported = false
+local function getPrompt(pedestal)
+    return pedestal:WaitForChild("BuyKnife")
+end
 
--- Función para ejecutar teletransporte y loadstring
-local function doTeleportAndLoad()
-    if hasTeleported then return end
+-- Esperar personaje y HRP
+local function esperarPersonajeYHRP()
     local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
     local hrp = char:WaitForChild("HumanoidRootPart")
-
-    -- Espera 1.5 segundos antes de teletransportar
-    wait(1.5)
-
-    -- Teletransportar
-    hrp.CFrame = CFrame.new(teleportCoords)
-
-    -- Enfocar cámara hacia el pedestal
-    if knifePedestal then
-        camera.CameraType = Enum.CameraType.Scriptable
-        camera.CFrame = CFrame.new(teleportCoords, knifePedestal.Position)
-    end
-
-    -- Ejecutar loadstring
-    loadstring(game:HttpGet("https://raw.githubusercontent.com/davidsebas348-hub/Text191/refs/heads/main/Text192.lua", true))()
-
-    hasTeleported = true
+    return char, hrp
 end
 
--- Detectar team y ejecutar
+-- Teletransportar, enfocar cámara y activar prompt
+local function teleportaYActiva()
+    if not _G.AutoBuyKnife then return end
+    local char, hrp = esperarPersonajeYHRP()
+    local pedestal = getKnifePedestal()
+    local prompt = getPrompt(pedestal)
+
+    -- Esperar 1.5 segundos antes de teletransportar
+    task.wait(1.5)
+
+    -- Teletransportar al jugador
+    local teleportPos = pedestal.Position + Vector3.new(0,3,-5)
+    hrp.CFrame = CFrame.new(teleportPos)
+
+    -- Enfocar cámara
+    camera.CameraType = Enum.CameraType.Scriptable
+    camera.CFrame = CFrame.new(teleportPos, pedestal.Position)
+
+    -- Activar ProximityPrompt
+    if prompt and prompt:IsA("ProximityPrompt") then
+        prompt:InputHoldBegin()
+        task.wait(0.1)
+        prompt:InputHoldEnd()
+    end
+
+    -- Volver control de cámara al jugador
+    task.wait(0.2)
+    camera.CameraType = Enum.CameraType.Custom
+    camera.CameraSubject = char:WaitForChild("Humanoid")
+end
+
+-- Ejecutar solo si estamos en Lobby
 local function checkTeam()
+    if not _G.AutoBuyKnife then return end
     if LocalPlayer.Team and LocalPlayer.Team.Name == "Lobby" then
-        doTeleportAndLoad()
+        teleportaYActiva()
     end
 end
-
--- Ejecutar al inicio
-checkTeam()
 
 -- Conectar cambios de team
 LocalPlayer:GetPropertyChangedSignal("Team"):Connect(checkTeam)
+
+-- Ejecutar al inicio si ya estamos en Lobby
+checkTeam()
