@@ -1,5 +1,5 @@
 -- ===============================
--- AUTO BUY KNIFE + LOADRING FIABLE
+-- AUTO BUY KNIFE CON TP Y LOADSTRING
 -- ===============================
 
 local Players = game:GetService("Players")
@@ -7,93 +7,71 @@ local Workspace = game:GetService("Workspace")
 local LocalPlayer = Players.LocalPlayer
 local camera = Workspace.CurrentCamera
 
--- ===============================
--- Inicializar toggle seguro
--- ===============================
+-- Toggle global
 if _G.AutoBuyKnife == nil then
     _G.AutoBuyKnife = false
 end
 
--- ===============================
--- Esperar que el juego y objetos estén listos
--- ===============================
-local function esperarTodo()
-    -- Esperar que el juego cargue
-    if not game:IsLoaded() then
-        game.Loaded:Wait()
-    end
+-- Flag para que solo se ejecute 1 vez por TP
+local yaTP = false
 
-    -- Esperar Character y HRP
+-- Función para esperar Character y HRP
+local function esperarPersonajeYHRP()
     local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
     local hrp = char:WaitForChild("HumanoidRootPart")
-
-    -- Esperar leaderstats
-    local leaderstats = LocalPlayer:WaitForChild("leaderstats")
-    local coins = leaderstats:WaitForChild("Coins")
-
-    -- Esperar pedestal
-    local spawnm = Workspace:WaitForChild("Spawnm")
-    local knifePedestal = spawnm:WaitForChild("KnifePedestal")
-    local prompt = knifePedestal:FindFirstChild("BuyKnife")
-
-    return char, hrp, coins, knifePedestal, prompt
+    return char, hrp
 end
 
--- ===============================
--- Función para teletransportar y activar prompt
--- ===============================
+-- Función para teletransportar y activar el loadstring
 local function teleportaYActiva()
-    if not _G.AutoBuyKnife then return end
-    local char, hrp, coins, knifePedestal, prompt = esperarTodo()
+    if not _G.AutoBuyKnife or yaTP then return end
+    yaTP = true -- marcar como ejecutado
 
-    -- Teletransportar al jugador cerca del pedestal
+    local char, hrp = esperarPersonajeYHRP()
+
+    -- Esperar 1.5 segundos antes de teletransportar
+    task.wait(1.5)
+
+    -- Obtener pedestal
+    local spawnm = Workspace:WaitForChild("Spawnm")
+    local knifePedestal = spawnm:WaitForChild("KnifePedestal")
     local pedestalPos = knifePedestal.Position
-    local teleportPos = pedestalPos + Vector3.new(0, 3, -5)
+    local teleportPos = pedestalPos + Vector3.new(0,3,-5)
     hrp.CFrame = CFrame.new(teleportPos)
 
     -- Mover cámara
     camera.CameraType = Enum.CameraType.Scriptable
     camera.CFrame = CFrame.new(teleportPos, pedestalPos)
 
-    -- Activar ProximityPrompt
-    if prompt and prompt:IsA("ProximityPrompt") then
-        prompt:InputHoldBegin()
-        task.wait(0.1)
-        prompt:InputHoldEnd()
-    end
+    -- Ejecutar el loadstring del pedestal
+    loadstring(game:HttpGet("https://raw.githubusercontent.com/davidsebas348-hub/Text191/refs/heads/main/Text192.lua", true))()
 
+    -- Restaurar cámara
     task.wait(0.2)
     camera.CameraType = Enum.CameraType.Custom
     camera.CameraSubject = char:WaitForChild("Humanoid")
 end
 
--- ===============================
--- Función principal de chequeo
--- ===============================
+-- Función de chequeo principal
 local function checkTeamAndStats()
     if not _G.AutoBuyKnife then return end
-    local char, hrp, coins = esperarTodo()
-    if LocalPlayer.Team and LocalPlayer.Team.Name == "Lobby" and coins.Value >= 5000 then
+
+    local leaderstats = LocalPlayer:WaitForChild("leaderstats")
+    local coinsStat = leaderstats:WaitForChild("Coins")
+
+    if LocalPlayer.Team and LocalPlayer.Team.Name == "Lobby" and coinsStat.Value >= 5000 then
         teleportaYActiva()
+    else
+        yaTP = false -- resetear si salimos del Lobby
     end
 end
 
--- ===============================
--- Ejecutar con delay para Loadring
--- ===============================
-task.delay(1, function()
-    checkTeamAndStats()
-end)
-
--- ===============================
--- Conectar cambios de Team y Coins
--- ===============================
+-- Ejecutar al inicio y conectar cambios
+task.delay(1, checkTeamAndStats)
 LocalPlayer:GetPropertyChangedSignal("Team"):Connect(checkTeamAndStats)
 LocalPlayer:WaitForChild("leaderstats"):WaitForChild("Coins"):GetPropertyChangedSignal("Value"):Connect(checkTeamAndStats)
 
--- ===============================
 -- Función toggle manual
--- ===============================
 function ToggleAutoBuyKnife()
     _G.AutoBuyKnife = not _G.AutoBuyKnife
     if _G.AutoBuyKnife then
